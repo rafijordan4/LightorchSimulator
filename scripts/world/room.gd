@@ -43,7 +43,7 @@ func _process(delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
     if event is InputEventScreenTouch:
-        var pos := make_input_local(event).position
+        var pos: Vector2 = make_input_local(event).position
 
         if event.pressed:
             if pos.distance_to(ACTION_CENTER) <= ACTION_RADIUS:
