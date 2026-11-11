@@ -11,6 +11,13 @@ var player_name := "Developer"
 var message := "Welcome to your new beginning."
 var show_computer_menu := false
 var interaction_hint := "Press E near the computer"
+var joystick_finger := -1
+var joystick_origin := Vector2.ZERO
+var joystick_vector := Vector2.ZERO
+const JOYSTICK_CENTER := Vector2(88, 235)
+const JOYSTICK_RADIUS := 52.0
+const ACTION_CENTER := Vector2(555, 235)
+const ACTION_RADIUS := 42.0
 
 func _ready() -> void:
     queue_redraw()
@@ -19,16 +26,55 @@ func _process(delta: float) -> void:
     var dir := Vector2(
         Input.get_action_strength("move_right") - Input.get_action_strength("move_left"),
         Input.get_action_strength("move_down") - Input.get_action_strength("move_up")
-    )
+    ) + joystick_vector
+
     if dir.length() > 1.0:
         dir = dir.normalized()
+
     player_pos += dir * speed * delta
     player_pos.x = clamp(player_pos.x, 42.0, 598.0)
     player_pos.y = clamp(player_pos.y, 88.0, 320.0)
-    if Input.is_action_just_pressed("interact") and player_pos.distance_to(Vector2(480, 145)) < 76:
+
+    if Input.is_action_just_pressed("interact"):
+        _try_interact()
+
+    queue_redraw()
+
+
+func _input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+        var pos := make_input_local(event).position
+
+        if event.pressed:
+            if pos.distance_to(ACTION_CENTER) <= ACTION_RADIUS:
+                _try_interact()
+                return
+
+            if pos.x < 180.0 and pos.y > 150.0 and joystick_finger == -1:
+                joystick_finger = event.index
+                joystick_origin = pos
+                _update_joystick(pos)
+
+        elif event.index == joystick_finger:
+            joystick_finger = -1
+            joystick_vector = Vector2.ZERO
+            queue_redraw()
+
+    elif event is InputEventScreenDrag and event.index == joystick_finger:
+        _update_joystick(make_input_local(event).position)
+
+
+func _update_joystick(pos: Vector2) -> void:
+    var offset := pos - joystick_origin
+    joystick_vector = offset.limit_length(JOYSTICK_RADIUS) / JOYSTICK_RADIUS
+    queue_redraw()
+
+
+func _try_interact() -> void:
+    if player_pos.distance_to(Vector2(480, 145)) < 76:
         show_computer_menu = !show_computer_menu
         message = "Computer: Create Game / Projects / Research" if show_computer_menu else "You closed the computer."
-    queue_redraw()
+        queue_redraw()
 
 func _draw() -> void:
     # Room floor
@@ -86,3 +132,15 @@ func _draw() -> void:
         draw_string(ThemeDB.fallback_font, Vector2(365, 235), "1. Start your first game", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
         draw_string(ThemeDB.fallback_font, Vector2(365, 255), "2. Check project board", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
         draw_string(ThemeDB.fallback_font, Vector2(365, 275), "Press E to close", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c5c8d0"))
+
+    # Virtual joystick
+    var stick_center := joystick_origin if joystick_finger != -1 else JOYSTICK_CENTER
+    draw_circle(stick_center, JOYSTICK_RADIUS, Color(0.08, 0.09, 0.12, 0.55))
+    draw_arc(stick_center, JOYSTICK_RADIUS, 0.0, TAU, 48, Color("#d4b77a"), 2.0)
+    draw_circle(stick_center + joystick_vector * JOYSTICK_RADIUS, 21.0, Color(0.83, 0.72, 0.52, 0.85))
+    draw_arc(stick_center + joystick_vector * JOYSTICK_RADIUS, 21.0, 0.0, TAU, 32, Color.WHITE, 2.0)
+
+    # Interaction button
+    draw_circle(ACTION_CENTER, ACTION_RADIUS, Color(0.08, 0.09, 0.12, 0.72))
+    draw_arc(ACTION_CENTER, ACTION_RADIUS, 0.0, TAU, 48, Color("#d4b77a"), 3.0)
+    draw_string(ThemeDB.fallback_font, ACTION_CENTER + Vector2(-25, 5), "USE", HORIZONTAL_ALIGNMENT_CENTER, 50, 15, Color.WHITE)
